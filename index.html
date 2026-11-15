@@ -26,12 +26,14 @@ button{font:inherit;color:inherit;cursor:pointer}.shell{max-width:1160px;margin:
 const $=s=>document.querySelector(s);
 const defaults={day:1,name:'',health:76,energy:78,morale:62,hunger:28,water:24,ammo:3,food:2,meds:1,people:0,flags:{},log:[],ended:false,ending:''};
 let g={...defaults};
+const pick=list=>list[Math.floor(Math.random()*list.length)];
+const makeStory=()=>({person:pick(['sister','brother','partner','best friend','mother','son']),district:pick(['Riverside','Old Town','the Warehouse District','Northgate','the university quarter']),outbreak:pick(['a hospital evacuation that collapsed','a highway pileup that sealed the bridges','a blackout that shut down the whole district','a storm that trapped people indoors','a crowded shelter that went silent']),weather:pick(['cold rain','a heavy fog','dry wind carrying ash','a sudden spring downpour','an unnaturally warm night']),firstEvent:pick(['A car alarm starts screaming down the block.','Someone pounds on a door across the street, then goes quiet.','The power flickers out across the neighborhood.','A helicopter circles once and disappears beyond the rooftops.','A dog runs through the street with a torn leash dragging behind it.'])});
 const scenes={
-start:{place:'YOUR NEIGHBORHOOD',title:'The world went quiet.',text:()=>`The emergency broadcast cut out sometime before dawn. From your apartment window, smoke rises beyond the river. Your phone has one message from ${g.name||'you'}’s sister: “I’m at the county clinic. Please come.” The streets are already changing.`,choices:[
-['🏃','Go to the clinic','Find your sister. The roads will be dangerous.','clinic',{}],
+start:{place:()=>g.story?.district.toUpperCase()||'YOUR NEIGHBORHOOD',title:'The world went quiet.',text:()=>`The emergency broadcast cut out sometime before dawn. ${g.story?.firstEvent||'The city has gone silent.'} The outbreak began after ${g.story?.outbreak||'the city fell into chaos'}. Your phone has one message from your ${g.story?.person||'sister'}: “I’m at the county clinic. Please come.” They are waiting in ${g.story?.district||'Riverside'}.`,choices:[
+['🏃','Go to the clinic',`Find your ${g.story?.person||'sister'}. The roads will be dangerous.`,'clinic',{}],
 ['🏠','Secure the apartment','Board the doors and gather what you can.','shelter',{}],
 ['🚗','Leave the city','The highway may still be open. Your sister will have to wait.','highway',{}]]},
-1:{place:'THE FIRST MORNING',title:'The world went quiet.',text:()=>`The emergency broadcast cut out sometime before dawn. From your apartment window, smoke rises beyond the river. Your phone has one message from ${g.name||'you'}’s sister: “I’m at the county clinic. Please come.” The streets are already changing.`,choices:[
+1:{place:'THE FIRST MORNING',title:'The world went quiet.',text:()=>scenes.start.text(),choices:[
 ['🏃','Go to the clinic','Find your sister. The roads will be dangerous.','clinic',{}],
 ['🏠','Secure the apartment','Board the doors and gather what you can.','shelter',{}],
 ['🚗','Leave the city','The highway may still be open. Your sister will have to wait.','highway',{}]]},
@@ -39,7 +41,7 @@ clinic:{place:'COUNTY CLINIC',title:'A long way through.',text:()=>`The clinic�
 ['🗝','Help the nurse','Get her out. Two people have a better chance.','rescue',{}],
 ['🧱','Make a distraction','Draw the infected toward the ambulance bay.','distract',{}],
 ['🔫','Spend a round','Clear the lobby quickly.','shoot',{}]]},
-shelter:{place:'YOUR APARTMENT',title:'The first night.',text:()=>`You wedge a table against the front door. The neighborhood is loud with sirens and breaking glass. You have a few hours before you need to move.`,choices:[
+shelter:{place:'YOUR APARTMENT',title:'The first night.',text:()=>`You wedge a table against the front door. ${g.story?.firstEvent||'The city groans outside.'} ${g.story?.weather||'Rain'} blurs the windows. You have a few hours before you need to move.`,choices:[
 ['🥫','Ration and rest','Recover your strength and make supplies last.','rest',{}],
 ['🔍','Search nearby apartments','Risk the halls for food and medicine.','scavenge',{}],
 ['📻','Check the radio','Listen for a safe zone or another survivor.','radio',{}]]},
@@ -47,38 +49,45 @@ highway:{place:'NORTHBOUND HIGHWAY',title:'The road out.',text:()=>`Cars are aba
 ['🤝','Help the family','Take a risk for people who need you.','family',{}],
 ['⛽','Search the cars','Look for fuel and supplies before moving on.','cars',{}],
 ['🌲','Cut through the woods','Avoid the highway and keep moving.','woods',{}]]},
-camp:{place:'PINE RIDGE CAMP',title:'A fragile refuge.',text:()=>`You reach an old ranger station tucked into the hills. A handful of survivors have made a camp here. There is a radio mast, a garden, and a lot of nervous eyes.`,choices:[
+camp:{place:()=>g.story?.camp||'PINE RIDGE CAMP',title:'A fragile refuge.',text:()=>`You reach an old ranger station tucked into the hills. A handful of survivors have made a camp here. ${g.story?.threat?`Your last scouting trip spotted ${g.story.threat}.`:pick(['The generator coughs but keeps running.','Rain drums on the old roof.','A few survivors argue quietly near the radio mast.','Someone has started clearing a patch for a garden.'])} There is a radio mast, a garden, and a lot of nervous eyes.`,choices:[
 ['📡','Repair the radio mast','Call for help beyond the valley.','mast',{}],
 ['🌱','Work on the garden','Build food for the people here.','garden',{}],
 ['🧭','Scout the valley','Find a safer route and learn what’s nearby.','scout',{}]]},
-clinic2:{place:'COUNTY CLINIC',title:'Someone is still here.',text:()=>`You spot a familiar blue coat near the pharmacy. Your sister made it this far. She is hurt, but alive.`,choices:[
+clinic2:{place:'COUNTY CLINIC',title:'Someone is still here.',text:()=>`You spot a familiar blue coat near the pharmacy. Your ${g.story?.person||'sister'} made it this far. They are hurt, but alive. Outside, ${g.story?.weather||'rain'} taps at the boarded windows.`,choices:[
 ['🩹','Treat her wound','Use your medicine and get her somewhere safe.','sister',{}],
 ['🚪','Get out now','The noise is drawing infected from every hall.','escape',{}]]},
 };
 const events={
-rescue:()=>{g.people++;g.morale+=13;g.meds++;g.flags.nurse=true;g.log.unshift('The nurse, Mara, joins you. She found a packet of antibiotics.');return 'Mara grabs your hand. “There’s a service exit. I know the way.” Together you slip out with antibiotics and a new companion.'},
-distract:()=>{g.energy-=14;g.health-=5;g.ammo++;return 'You bang on the ambulance bay doors. The infected turn toward the noise. You escape scraped and exhausted, with a few rounds from the security desk.'},
-shoot:()=>{if(g.ammo>0){g.ammo--;g.health-=8;g.meds++;g.flags.sister=true;return 'The shot echoes through the building. You make it to the pharmacy and find your sister—hurt, but alive. The noise brings more infected.'}g.health-=25;return 'Your weapon clicks empty. You flee through a side door, bitten and bleeding.'},
+rescue:()=>{const nurse=pick(['Mara','Dev','Ruth','Jules','Nico']);g.people++;g.morale+=13;g.meds++;g.flags.nurse=nurse;return `${nurse} grabs your hand. “There’s a service exit. I know the way.” You slip out together with antibiotics and a new companion.`},
+distract:()=>{g.energy-=14;g.health-=5;if(Math.random()<.6)g.ammo++;return pick(['You bang on the ambulance bay doors. The infected turn toward the noise. You escape scraped and exhausted.','You trigger the fire alarm and slip through the service hall while the lobby empties.','You toss a metal tray down the corridor. The distraction works, but the sprint leaves you winded.'])+(g.ammo>3?' A guard dropped a few rounds.':'')},
+shoot:()=>{if(g.ammo>0){g.ammo--;g.health-=8;g.meds++;g.flags.sister=true;return `The shot echoes through the building. You make it to the pharmacy and find your ${g.story?.person||'sister'}—hurt, but alive. The noise brings more infected.`}g.health-=25;return 'Your weapon clicks empty. You flee through a side door, bitten and bleeding.'},
 shelter:()=>{g.food++;g.water++;g.energy+=10;return 'You reinforce the apartment and gather what you can. It buys you one quiet night, not a future.'},
 rest:()=>{g.energy=Math.min(100,g.energy+28);g.hunger+=10;g.morale+=4;return 'You sleep in short, uneasy stretches. Your body feels steadier, though your stomach is empty.'},
-scavenge:()=>{g.food+=2;g.water++;if(Math.random()<.45)g.meds++;g.health-=Math.random()<.3?8:0;return 'You find canned food, bottled water, and a small first aid kit. Something moved in the stairwell while you were searching.'},
-radio:()=>{g.flags.radio=true;g.morale+=6;return 'A scratchy voice repeats coordinates for a ranger station in Pine Ridge. It sounds like a real place. You mark it on a paper map.'},
+scavenge:()=>{let finds=pick(['a crate of canned soup','a backpack with dry food','sealed bottles beneath a sink','a first aid kit and a few cans']);g.food+=Math.random()<.7?2:1;g.water++;if(Math.random()<.45)g.meds++;const danger=Math.random()<.28;if(danger)g.health-=8;return `You search the empty apartments and find ${finds}. ${danger?'A loose stair gives way beneath you, leaving a painful bruise.':'You hear movement nearby, but make it back unseen.'}`},
+radio:()=>{g.flags.radio=true;g.morale+=6;g.story.radioVoice=pick(['a volunteer dispatcher','a park ranger','a child reading coordinates','a calm voice using an old call sign']);g.story.camp=pick(['Pine Ridge','Juniper Hollow','Cedar Pass','Greywater Station']);return `${g.story.radioVoice} repeats coordinates for ${g.story.camp}, an old ranger station. It sounds like a real place. You mark it on a paper map.`},
 family:()=>{g.people+=2;g.food--;g.energy-=15;g.morale+=12;g.flags.family=true;return 'You get the family off the bus. There are three of them, and they share their last can of peaches with you.'},
 cars:()=>{g.food++;g.ammo++;g.energy-=8;return 'You find a half-full water bottle, a box of shells, and a map to an old ranger station.'},
 woods:()=>{g.health-=8;g.energy-=12;g.flags.woods=true;return 'Briars tear your sleeves and the forest is hard to navigate. But you avoid the worst of the highway and find a ranger station.'},
 mast:()=>{if(g.flags.radio){g.flags.signal=true;g.morale+=18;return 'You climb the tower and splice the wire. A voice answers through the static: a relief convoy is three days away. They can take everyone.'}g.energy-=18;g.morale+=6;return 'You get the mast powered, but the antenna is damaged. You need a radio frequency to make contact.'},
 garden:()=>{g.food+=2;g.morale+=8;g.flags.garden=true;return 'You spend the day clearing weeds and planting seeds. It is a small start, but the camp has something to look forward to.'},
-scout:()=>{g.energy-=12;g.flags.scouted=true;g.ammo++;return 'You find a ridge path to the river, and a box of old flares. From above, you can see the camp is surrounded—but not yet found.'},
-sister:()=>{if(g.meds>0){g.meds--;g.flags.sister=true;g.people++;g.morale+=18;return 'You use your last medicine to treat your sister. She is weak, but she can walk. She squeezes your hand: “We’ll make it.”'}g.health-=10;g.people++;g.flags.sister=true;return 'You have no medicine. You clean and bind the wound as best you can. She joins you, pale but determined.'},
-escape:()=>{g.health-=6;g.flags.sister=true;g.people++;return 'You pull your sister through the service exit and into the dawn. She is with you.'}
+scout:()=>{g.energy-=12;g.flags.scouted=true;if(Math.random()<.65)g.ammo++;g.story.threat=pick(['a pack of infected moving in the valley','a smoke plume rising east of camp','fresh tire tracks on the ridge','a quiet trail leading down to the river']);return `You find a ridge path. From above, you spot ${g.story.threat}. ${g.ammo>3?'A box of flares is tucked under a fallen sign.':'You return with a clearer map of the area.'}`},
+sister:()=>{const person=g.story?.person||'sister';if(g.meds>0){g.meds--;g.flags.sister=true;g.people++;g.morale+=18;return `You use your medicine to treat your ${person}. They are weak, but can walk. “We’ll make it,” they promise.`}g.health-=10;g.people++;g.flags.sister=true;return `You have no medicine. You clean and bind your ${person}’s wound as best you can. They join you, pale but determined.`},
+escape:()=>{g.health-=6;g.flags.sister=true;g.people++;return `You pull your ${g.story?.person||'sister'} through the service exit and into the dawn. They are with you.`}
 };
+function rollEncounter(){
+const roll=Math.random();
+if(roll<.22){const found=pick(['a forgotten cache of canned food','a clean bottle of water','a few useful bandages','a box of old ammunition']);if(found.includes('food'))g.food++;else if(found.includes('water'))g.water++;else if(found.includes('bandages'))g.meds++;else g.ammo++;return `Along the way: ${found} was tucked beneath the floorboards.`}
+if(roll<.42){g.morale+=pick([3,5,7]);return `Along the way: ${pick(['a stranger leaves a candle in the window','you hear music from a battery radio','someone has painted “KEEP GOING” on a wall'])}. The small kindness steadies you.`}
+if(roll<.65){const loss=pick(['energy','health']);g[loss]-=loss==='health'?5:8;return `Along the way: ${pick(['a distant scream sends you running','rain turns the road into slick mud','a sudden crash draws infected to your route'])}. You lose some ${loss}.`}
+return `Along the way: ${pick(['you find an empty bus with its doors wide open','the wind carries ash across the road','a flock of birds lifts from the rooftops'])}. Nothing follows you this time.`
+}
 function render(){
 const scene=scenes[g.place]||scenes.camp;
 $('#app').innerHTML=`<div class="shell"><header class="topbar"><div class="brand">AFTER<span>LIGHT</span><small>A SURVIVAL STORY</small></div><div class="top-actions"><button class="iconbtn" id="save">↗ Save</button><button class="iconbtn" id="restart">↻ New story</button></div></header>
 <div class="layout"><aside class="side"><section class="card survivor"><div class="eyebrow">Survivor profile</div><div class="name-line"><div class="name">${esc(g.name||'Survivor')}</div><div class="badge">Day ${g.day}</div></div>${stat('Health',g.health,'health')}${stat('Energy',g.energy,'energy')}${stat('Morale',g.morale,'morale')}${stat('Hunger',100-g.hunger,'')}</section>
 <section class="card"><div class="eyebrow" style="margin-bottom:12px">Pack & supplies</div><div class="inventory">${item('Food',g.food,'🥫')}${item('Water',g.water,'💧')}${item('Medicine',g.meds,'✚')}${item('Ammo',g.ammo,'▸')}${item('Companions',g.people,'♙')}</div></section>
 <section class="card"><div class="eyebrow">Field notes</div><div class="log">${g.log.slice(0,5).map(x=>'<div class="logline">◦ <strong>'+esc(x)+'</strong></div>').join('')||'<div class="logline">Your story is just beginning.</div>'}</div></section></aside>
-<main class="main"><section class="hero"><div class="kicker">DAY ${g.day} &nbsp;·&nbsp; ${scene.place}</div><h1>${scene.title}</h1><p>${scene.text()}</p></section>
+<main class="main"><section class="hero"><div class="kicker">DAY ${g.day} &nbsp;·&nbsp; ${typeof scene.place==='function'?scene.place():scene.place}</div><h1>${scene.title}</h1><p>${scene.text()}</p></section>
 <section class="card"><div class="eyebrow">What will you do?</div><p class="narrative">${g.day===1?'Every choice costs something. Keep yourself alive, and decide what kind of person you want to be.':'The hours pass. The world keeps asking what you’re willing to risk.'}</p><div class="choices">${scene.choices.map(([icon,title,desc,key])=>'<button class="choice" data-choice="'+key+'"><span class="choice-icon">'+icon+'</span><span class="choice-copy"><b>'+title+'</b><small>'+desc+'</small></span><span class="choice-arrow">›</span></button>').join('')}</div></section>
 <div class="footer"><span>NO TWO STORIES END THE SAME</span><span>DAY ${g.day} / ?</span></div></main></div></div>`;
 document.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>choose(b.dataset.choice));$('#restart').onclick=confirmRestart;$('#save').onclick=saveGame;
@@ -88,7 +97,7 @@ function item(label,n,icon){return '<div class="item"><span>'+icon+' '+label+'</
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function choose(key){
 if(['clinic','shelter','highway'].includes(key)){g.place=key;render();return}
-const fn=events[key];if(!fn)return;const message=fn();g.log.unshift('Day '+g.day+': '+message);g.log=g.log.slice(0,20);
+const fn=events[key];if(!fn)return;const message=fn();g.log.unshift('Day '+g.day+': '+message);g.log.unshift(rollEncounter());g.log=g.log.slice(0,20);
 g.hunger+=9;g.energy-=4;g.day++;
 if(g.hunger>=75){g.health-=8;g.log.unshift('Hunger is catching up with you.');}
 if(g.food>0&&Math.random()<.35){g.food--;g.hunger=Math.max(0,g.hunger-15)}
@@ -112,10 +121,10 @@ $('#again').onclick=()=>showStart();$('#keep').onclick=()=>{$('.overlay').remove
 }
 function confirmRestart(){if(confirm('Start a new story? Your current story will be replaced.'))showStart()}
 function saveGame(){try{localStorage.setItem('afterlight-save',JSON.stringify(g));alert('Story saved on this device.')}catch(e){alert('Could not save this story.')}}
-function loadGame(){try{const x=JSON.parse(localStorage.getItem('afterlight-save'));if(x&&x.day)g=x}catch(e){}}
+function loadGame(){try{const x=JSON.parse(localStorage.getItem('afterlight-save'));if(x&&x.day){g=x;if(!g.story)g.story=makeStory()}}catch(e){}}
 function showStart(){
-$('#app').innerHTML='<div class="overlay"><div class="modal"><div class="brand">AFTER<span>LIGHT</span><small>A SURVIVAL STORY</small></div><div style="height:20px"></div><div class="eyebrow">A choice-driven survival game</div><h1>The world ended.<br>What will you do?</h1><p class="intro">A zombie outbreak has torn through the city. Your sister is missing. Food is scarce. Every decision changes what happens next—and who makes it through with you.</p><div class="field"><label for="player">Your name</label><input id="player" maxlength="22" placeholder="What should we call you?" value="'+esc(g.name)+'"></div><div class="row"><button class="primary" id="start">Start your story →</button><button class="quiet" id="continue">Continue saved story</button></div><p style="font-size:11px;margin:17px 0 0;color:#788075">One decision at a time. There are no perfect choices.</p></div></div>';
-$('#start').onclick=()=>{let n=$('#player').value.trim();g={...defaults,name:n||'Alex',flags:{},log:[],ended:false};g.place='start';render();};
+$('#app').innerHTML='<div class="overlay"><div class="modal"><div class="brand">AFTER<span>LIGHT</span><small>A SURVIVAL STORY</small></div><div style="height:20px"></div><div class="eyebrow">A choice-driven survival game</div><h1>The world ended.<br>What will you do?</h1><p class="intro">Every new run rolls a different missing person, outbreak, starting supplies, local events and survival hazards. Your decisions shape who makes it through.</p><div class="field"><label for="player">Your name</label><input id="player" maxlength="22" placeholder="What should we call you?" value="'+esc(g.name)+'"></div><div class="row"><button class="primary" id="start">Start your story →</button><button class="quiet" id="continue">Continue saved story</button></div><p style="font-size:11px;margin:17px 0 0;color:#788075">One decision at a time. There are no perfect choices.</p></div></div>';
+$('#start').onclick=()=>{let n=$('#player').value.trim();g={...defaults,name:n||'Alex',story:makeStory(),health:pick([62,68,76,82,90]),energy:pick([60,70,78,86,94]),morale:pick([42,54,62,74,86]),food:pick([1,2,2,3]),water:pick([1,2,3]),ammo:pick([1,2,3,4]),meds:pick([0,1,1,2]),hunger:pick([18,24,28,36]),flags:{},log:[],ended:false};g.place='start';render();};
 $('#continue').onclick=()=>{loadGame();g.place=g.place||'start';render()};
 }
 g.place='start';showStart();
