@@ -46,16 +46,16 @@ highway:{place:'NORTHBOUND HIGHWAY',title:'The road out.',text:()=>`Cars are aba
 ['🤝','Help the family','Take a risk for people who need you.','family',{}],
 ['⛽','Search the cars','Look for fuel and supplies before moving on.','cars',{}],
 ['🌲','Cut through the woods','Avoid the highway and keep moving.','woods',{}]]},
-camp:{place:()=>g.story?.camp||'PINE RIDGE CAMP',title:'A fragile refuge.',text:()=>`You reach an old ranger station tucked into the hills. A handful of survivors have made a camp here. ${g.story?.threat?`Your last scouting trip spotted ${g.story.threat}.`:pick(['The generator coughs but keeps running.','Rain drums on the old roof.','A few survivors argue quietly near the radio mast.','Someone has started clearing a patch for a garden.'])} There is a radio mast, a garden, and a lot of nervous eyes.`,choices:[
-['📡','Repair the radio mast','Call for help beyond the valley.','mast',{}],
-['🌱','Work on the garden','Build food for the people here.','garden',{}],
-['🧭','Scout the valley','Find a safer route and learn what’s nearby.','scout',{}]]},
+camp:{place:()=>g.story?.camp||'PINE RIDGE CAMP',title:()=>g.day===2?'The next move is yours.':'A fragile refuge.',text:()=>`You reach an old ranger station tucked into the hills. A handful of survivors have made a camp here. ${g.story?.threat?`Your last scouting trip spotted ${g.story.threat}.`:pick(['The generator coughs but keeps running.','Rain drums on the old roof.','A few survivors argue quietly near the radio mast.','Someone has started clearing a patch for a garden.'])} ${g.lastOutcome?`Your last decision: ${g.lastOutcome}`:'There is a radio mast, a garden, and a lot of nervous eyes.'}`,choices:()=>{const s=g.story||{};const rest=['🛏','Rest and recover','Regain energy, but spend another day.','rest'];const radio=['📻','Tune the radio','Search for a safe camp and rescue channel.','radio'];const scout=['🧭','Scout the route','Find a safer path and see what is nearby.','scout'];if(s.type==='missing'&&!g.flags.contactFound)return [['🔎',`Look for your ${s.person}`,'Search the clinic before the trail goes cold.','findContact'],radio,rest];if(s.type==='missing')return [g.flags.radio?['📡','Call the rescue convoy','Use the coordinates you found to signal for help.','mast']:radio,scout,['🌱','Help the camp','Build food and lift everyone’s spirits.','garden']];if(s.type==='medicine'&&!g.flags.medicine)return [['💊','Search for antibiotics','The camp’s supply is running out.','searchMedicine'],radio,rest];if(s.type==='medicine')return [['📦','Deliver the medicine','Get the antibiotics to the sick survivors.','deliverMedicine'],scout,rest];if(s.type==='broadcast')return g.flags.radio?[['📡','Repair the relay','Restore the emergency broadcast.','mast'],scout,rest]:[radio,scout,rest];if(g.flags.family)return [['🚧','Guide the convoy through','Lead the rescued people along the path you scouted.','scout'],radio,rest];return [scout,['🤝','Gather more survivors','Find people who can help clear the checkpoint.','family'],rest]}},
 clinic2:{place:()=>g.story?.target||'COUNTY CLINIC',title:'Someone is still here.',text:()=>`You spot a familiar blue coat near the pharmacy. Your ${g.story?.person||'sister'} made it this far. They are hurt, but alive. Outside, ${g.story?.weather||'rain'} taps at the boarded windows.`,choices:[
 ['🩹','Treat their wound','Use your medicine and get them somewhere safe.','sister',{}],
 ['🚪','Get out now','The noise is drawing infected from every hall.','escape',{}]]},
 };
 const events={
 rescue:()=>{const helper=pick(['Mara','Dev','Ruth','Jules','Nico']);g.people++;g.morale+=13;g.meds++;g.flags.nurse=helper;return `${helper} grabs your hand. “There’s a way out. I know the way.” You slip to safety together, with medicine and a new companion.`},
+findContact:()=>{g.flags.contactFound=true;return `You find your ${g.story?.person||'sister'} sheltering in the clinic pharmacy. They are injured, but alive.`},
+searchMedicine:()=>{g.flags.medicine=true;g.meds+=2;return 'You find a sealed antibiotic case in a nearby dispensary. It is exactly what the camp needs.'},
+deliverMedicine:()=>{g.people++;g.flags.medicineDelivered=true;return `You deliver the antibiotics to the camp medic at ${g.story?.camp||'the ranger station'}. The sick survivors finally have a chance to recover.`},
 distract:()=>{g.energy-=14;g.health-=5;if(Math.random()<.6)g.ammo++;return pick(['You bang on the ambulance bay doors. The infected turn toward the noise. You escape scraped and exhausted.','You trigger the fire alarm and slip through the service hall while the lobby empties.','You toss a metal tray down the corridor. The distraction works, but the sprint leaves you winded.'])+(g.ammo>3?' A guard dropped a few rounds.':'')},
 shoot:()=>{if(g.ammo>0){g.ammo--;g.health-=8;if(g.story?.type==='missing'){g.meds++;g.flags.contactFound=true;return `The shot echoes through the building. You find your ${g.story.person} hurt but alive in the pharmacy. The noise brings more infected.`}if(g.story?.type==='medicine'){g.meds+=2;g.flags.medicine=true;return 'You reach the pharmacy and recover the antibiotics the camp needs. The shot draws infected from the surrounding streets.'}g.meds++;return pick(['You clear a path through the lobby and reach a radio console. The shot draws infected from nearby.','You find a working hand radio in the security office, but the noise draws a crowd.'])}g.health-=25;return 'Your weapon clicks empty. You flee through a side door, bitten and bleeding.'},
 shelter:()=>{g.food++;g.water++;g.energy+=10;return 'You reinforce the apartment and gather what you can. It buys you one quiet night, not a future.'},
@@ -94,18 +94,19 @@ function item(label,n,icon){return '<div class="item"><span>'+icon+' '+label+'</
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function choose(key){
 if(['clinic','shelter','highway'].includes(key)){g.place=key;render();return}
-const fn=events[key];if(!fn)return;const message=fn();g.log.unshift('Day '+g.day+': '+message);g.log.unshift(rollEncounter());g.log=g.log.slice(0,20);
+const fn=events[key];if(!fn)return;const message=fn();g.lastOutcome=message;g.log.unshift('Day '+g.day+': '+message);g.log.unshift(rollEncounter());g.log=g.log.slice(0,20);
 g.hunger+=9;g.energy-=4;g.day++;
 if(g.hunger>=75){g.health-=8;g.log.unshift('Hunger is catching up with you.');}
 if(g.food>0&&Math.random()<.35){g.food--;g.hunger=Math.max(0,g.hunger-15)}
 if(g.water>0&&Math.random()<.5){g.water--;g.health=Math.min(100,g.health+2)}
-if(key==='rescue'||key==='distract'||key==='shoot')g.place=(g.flags.contactFound?'clinic2':'camp');
+if(key==='findContact')g.place='clinic2';
+else if(key==='rescue'||key==='distract'||key==='shoot')g.place=(g.flags.contactFound?'clinic2':'camp');
 else if(['shelter','rest','scavenge','radio'].includes(key))g.place='camp';
 else if(['family','cars','woods'].includes(key))g.place='camp';
 else if(['mast','garden','scout'].includes(key)){if(g.flags.signal){endGame('signal')}else g.place='camp';}
 else if(['sister','escape'].includes(key)){g.place='camp'}
 if(g.health<=0){endGame('lost');return}
-if(g.story?.type==='medicine'&&g.flags.medicine&&['mast','garden','scout'].includes(key)){endGame('medicine');return}
+if(g.story?.type==='medicine'&&key==='deliverMedicine'){endGame('medicine');return}
 if(g.story?.type==='convoy'&&key==='scout'){endGame('convoy');return}
 if(g.day>9&&!g.flags.signal){endGame('endure');return}
 render();
